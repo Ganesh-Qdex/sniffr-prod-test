@@ -1,7 +1,10 @@
 require('dotenv').config();
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const User = require('./models/User');
+const authRoutes = require('./routes/auth');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,11 +12,26 @@ const PORT = process.env.PORT || 3000;
 // Connect to MongoDB
 connectDB();
 
+// General rate limiting
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: {
+        error: 'Too many requests from this IP, please try again later.'
+    }
+});
+
 // Middleware to parse JSON
 app.use(express.json());
 
-// GET /api/users - Get all users
-app.get('/api/users', async (req, res) => {
+// Apply general rate limiting
+app.use(generalLimiter);
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
+
+// GET /api/users - Get all users (protected)
+app.get('/api/users', authenticateToken, async (req, res) => {
     try {
         const users = await User.find();
         res.json(users);
@@ -22,8 +40,8 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// GET /api/users/:id - Get user by ID
-app.get('/api/users/:id', async (req, res) => {
+// GET /api/users/:id - Get user by ID (protected)
+app.get('/api/users/:id', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         
@@ -40,8 +58,8 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-// POST /api/users - Create a new user
-app.post('/api/users', async (req, res) => {
+// POST /api/users - Create a new user (protected)
+app.post('/api/users', authenticateToken, async (req, res) => {
     try {
         const { name, email } = req.body;
 
@@ -64,8 +82,8 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// PUT /api/users/:id - Update an existing user
-app.put('/api/users/:id', async (req, res) => {
+// PUT /api/users/:id - Update an existing user (protected)
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
     try {
         const { name, email } = req.body;
 
@@ -98,8 +116,8 @@ app.put('/api/users/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/users/:id - Delete a user
-app.delete('/api/users/:id', async (req, res) => {
+// DELETE /api/users/:id - Delete a user (protected)
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     try {
         const user = await User.findByIdAndDelete(req.params.id);
 
